@@ -12,12 +12,9 @@ spec:
       labels:
         app: controller-cloudrun
     spec:
-      serviceAccountName: gcp
-      nodeSelector:
-        iam.gke.io/gke-metadata-server-enabled: "true"
       containers:
       - name: controller
-        image: us-central1-docker.pkg.dev/mofilabs-next-demo-02/scaling/controller:v0.1.14
+        image: controller:v1.0 # kpt-set: ${image-id}
         resources:
           limits:
             memory: "4Gi"
@@ -35,11 +32,14 @@ spec:
             port: 8000
           periodSeconds: 3
         env:
-          - name: PROJECT_ID
-            value: mofilabs-next-demo-02
-          - name: INSTANCE_COLLECTION
-            value: cr-instances
-          - name: LED_COLLECTION
-            value: cr
-          - name: GAMMA
-            value: "20.0"
+        - name: PROJECT_ID
+          value: project # kpt-set: ${project-id}
+        - name: FIRESTORE_DATABASE
+          value: "demo"
+        - name: INSTANCE_COLLECTION
+          value: "cr-instances"
+        - name: LED_COLLECTION
+          value: "cr"
+        - name: GAMMA
+          value: "20.0"
+      serviceAccountName: sa # kpt-set: ${k-service-account}

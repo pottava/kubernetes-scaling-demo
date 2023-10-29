@@ -3,8 +3,11 @@ apiVersion: gateway.networking.k8s.io/v1beta1
 metadata:
   name: instance
 spec:
-  gatewayClassName: gke-l7-gxlb
+  gatewayClassName: gke-l7-global-external-managed
   listeners:
   - name: http
     protocol: HTTP
     port: 80
+    allowedRoutes:
+      kinds:
+      - kind: HTTPRoute
