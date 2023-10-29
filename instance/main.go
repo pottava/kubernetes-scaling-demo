@@ -68,9 +68,16 @@ func main() {
 					status = ACTIVE
 				}
 
-				if status != instance.Status || time.Since(instance.LastReported) > 15*time.Second {
+				if status != instance.Status {
 					log.Printf("Status changed from %d to %d\n", instance.Status, status)
 					instance.Status = status
+					instance.LastReported = time.Now()
+					_, err := client.Collection(instanceCollection).Doc(hostName).Set(ctx, instance)
+					if err != nil {
+						log.Fatalln(err)
+					}
+				}
+				if time.Since(instance.LastReported) > 10*time.Second {
 					instance.LastReported = time.Now()
 					_, err := client.Collection(instanceCollection).Doc(hostName).Set(ctx, instance)
 					if err != nil {

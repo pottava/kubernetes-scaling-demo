@@ -133,14 +133,14 @@ func main() {
 					instance := Instance{doc.Data()["Id"].(string), int(doc.Data()["Status"].(int64)), doc.Data()["LastReported"].(time.Time)}
 					instances[instance.Id] = instance
 
-					if instance.Status == TERMINATED && time.Since(instance.LastReported) > 5*time.Second {
+					if instance.Status == TERMINATED && time.Since(instance.LastReported) > 10*time.Second {
 						_, err := client.Collection(instanceCollection).Doc(instance.Id).Delete(ctx)
 						if err != nil {
 							log.Println(err)
 						}
 					}
 
-					if time.Since(instance.LastReported) > 30*time.Second {
+					if time.Since(instance.LastReported) > 15*time.Second {
 						client.Collection(instanceCollection).Doc(instance.Id).Set(ctx, map[string]interface{}{
 							"Id":           instance.Id,
 							"Status":       TERMINATED,
@@ -156,8 +156,9 @@ func main() {
 				_, err := client.Collection(ledCollection).Doc("data").Set(ctx, ledData)
 				if err != nil {
 					log.Println(err)
+				} else {
+					log.Printf("wrote %d bytes to firestore", len(ledData.Data))
 				}
-				log.Printf("wrote %d bytes to firestore", len(ledData.Data))
 			}
 		}
 	}()
