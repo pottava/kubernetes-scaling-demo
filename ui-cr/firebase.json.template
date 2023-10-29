@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "site": "led-sim-cloud-run",
+    "site": "project-id-led-cloudrun",
     "public": "dist",
     "ignore": [
       "firebase.json",
@@ -13,5 +13,12 @@
         "destination": "/index.html"
       }
     ]
-  }
+  },
+  "firestore": [
+    {
+      "database": "demo",
+      "rules": "firestore.rules",
+      "indexes": "firestore.indexes.json"
+    }
+  ]
 }

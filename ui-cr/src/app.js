@@ -1,6 +1,5 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
 import { getFirestore, doc, getDoc } from "firebase/firestore"
 
 const leds = document.getElementById("leds");
@@ -8,21 +7,17 @@ const leds = document.getElementById("leds");
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-    apiKey: "AIzaSyBvF6pmf9rnqdxxjs88JOli41-oJJLSbl4",
-    authDomain: "mofilabs-next-demo-02.firebaseapp.com",
-    projectId: "mofilabs-next-demo-02",
-    storageBucket: "mofilabs-next-demo-02.appspot.com",
-    messagingSenderId: "690199829387",
-    appId: "1:690199829387:web:0397ff79c29c85b72e6d8e",
-    measurementId: "G-XS9819HYR1"
+    apiKey: "AIz..",
+    authDomain: "<your-project-id>.firebaseapp.com",
+    projectId: "<your-project-id>",
+    storageBucket: "<your-project-id>.appspot.com",
+    messagingSenderId: "12345678901234",
+    appId: "1:12345678901234:web:b6.."
 };
-
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
-
-const db = getFirestore(app);
+const db = getFirestore(app, "demo");
 
 async function getMapping(db) {
     const docRef = doc(db, "mapping", "data")
@@ -54,7 +49,7 @@ function intToHexColor(intValue) {
 
 
 async function getLedData(db) {
-    const docRef = doc(db, "cloudrun", "data")
+    const docRef = doc(db, "cr", "data")
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
         const { data } = docSnap.data();
