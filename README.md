@@ -145,7 +145,7 @@ docker tag controller "${repo}/controller:v0.5"
 docker push "${repo}/controller:v0.5"
 ```
 
-### Cloud Run
+### Instance on Cloud Run
 
 1. アプリケーション用のサービスアカウントを作成
 
@@ -164,7 +164,7 @@ gcloud projects add-iam-policy-binding "${project_id}" \
 ```sh
 gcloud run deploy demo-instance --platform "managed" --region "asia-northeast1" \
     --image "${repo}/instance:v0.5" --cpu 1.0 --memory 512Mi --no-cpu-throttling \
-    --concurrency 5 --min-instances 0  --max-instances 1000 \
+    --concurrency 3 --min-instances 0  --max-instances 1000 \
     --ingress "internal-and-cloud-load-balancing" --allow-unauthenticated \
     --set-env-vars "PROJECT_ID=${project_id},FIRESTORE_DATABASE=demo,INSTANCE_COLLECTION=cr-instances,LED_COLLECTION=cr" \
     --service-account "demo-apis@${project_id}.iam.gserviceaccount.com"
@@ -202,21 +202,21 @@ gcloud compute backend-services create demo-instance-cr --region "asia-northeast
 gcloud compute backend-services add-backend demo-instance-cr --region "asia-northeast1" \
     --network-endpoint-group "neg-instance-cr" \
     --network-endpoint-group-region "asia-northeast1"
-gcloud compute url-maps create default --region "asia-northeast1" \
+gcloud compute url-maps create url-instance-cr --region "asia-northeast1" \
     --default-service "demo-instance-cr" 
-gcloud compute target-http-proxies create default \
-    --region "asia-northeast1" --url-map "default"
-gcloud compute forwarding-rules create default \
+gcloud compute target-http-proxies create proxy-instance-cr \
+    --region "asia-northeast1" --url-map "url-instance-cr"
+gcloud compute forwarding-rules create demo-instance-cr \
     --load-balancing-scheme "EXTERNAL_MANAGED" --network-tier "STANDARD" \
     --region "asia-northeast1" --network "demo-network" \
     --target-http-proxy-region "asia-northeast1" \
     --address "demo-instance-cr" --ports "80" \
-    --target-http-proxy "default"
+    --target-http-proxy "proxy-instance-cr"
 echo "http://$( gcloud compute addresses describe demo-instance-cr \
     --region "asia-northeast1" --format json | jq -r .address )/"
 ```
 
-### Google Kubernetes Engine, GKE
+### Instance on GKE
 
 1. GKE Standard クラスタの作成
 
@@ -225,7 +225,7 @@ gcloud container clusters create demo --release-channel "stable" \
     --machine-type "e2-standard-4" --num-nodes 1 --min-nodes 1 --max-nodes 100 \
     --enable-autoscaling --workload-pool="${project_id}.svc.id.goog" \
     --network "demo-network" --subnetwork "demo-tokyo" --zone "asia-northeast1-c" \
-    --enable-image-streaming
+    --gateway-api "standard" --enable-image-streaming
 ```
 
 2. Workload Identity 経由でのアプリ用サービスアカウント利用を許可
@@ -237,7 +237,7 @@ gcloud iam service-accounts add-iam-policy-binding \
     --role roles/iam.workloadIdentityUser
 ```
 
-3. Instance をデプロイ
+3. デプロイ
 
 環境依存の設定値をファイルに書き出し、
 
@@ -259,4 +259,110 @@ Kpt でレンダリングしたマニフェストを apply します。
 
 ```sh
 kpt fn render k8s/instance/ -o unwrap | kubectl apply -f -
+```
+
+4. LB & HPA の設置
+
+```sh
+kubectl apply -f k8s/instance-lb
+```
+
+ロードバランサが設定されるまで数分かかります。  
+しばらくしてから以下のコマンドで得られる URL にアクセスし、応答があることを確認します。
+
+```sh
+echo "http://$( kubectl get gateways.gateway.networking.k8s.io instance -o json \
+    | jq -r ".status.addresses[0].value" )/status"
+```
+
+### Controllers on GKE
+
+GKE と Cloud Run、それぞれの Controller を GKE 上にデプロイします。  
+環境依存の設定値をファイルに書き出し、
+
+```txt
+cat << EOF >k8s/controller/setters.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: setters
+data:
+  project-id: "${project_id}"
+  image-id: "asia-northeast1-docker.pkg.dev/${project_id}/demo/controller:v0.5"
+  k-service-account: "demo-apis"
+EOF
+```
+
+Kpt でレンダリングしたマニフェストを apply します。
+
+```sh
+kpt fn render k8s/controller/ -o unwrap | kubectl apply -f -
+```
+
+ロードバランサが設定されるまで数分かかります。  
+しばらくしてから以下のコマンドで得られる URL にアクセスしてみましょう。
+
+```sh
+echo "http://$( kubectl get services controller-cloudrun \
+   -o jsonpath='{.status.loadBalancer.ingress[0].ip}' )/"
+echo "http://$( kubectl get services controller-gke \
+   -o jsonpath='{.status.loadBalancer.ingress[0].ip}' )/"
+```
+
+### Load generator on Cloud Run
+
+1. アプリケーションの確認
+
+```sh
+docker build -t loadgen load-gen/
+docker run --name loadgen -d --rm -p 9000:9000 \
+    -e PROJECT_ID=$( gcloud config get-value project ) -e PORT=9000 \
+    -e URL="http://$( gcloud compute addresses describe demo-instance-cr \
+        --region 'asia-northeast1' --format 'json' | jq -r '.address' )/wait?s=3" \
+    -e REQUEST=1000 -e CONCURRENCY=100 -e DURATION=30 -e TIMEOUT=10 \
+    -e ENVIRONMENT='Cloud Run' loadgen
+```
+
+Web にアクセスし、負荷をかけてみます。
+
+http://localhost:9000/
+
+問題がなければ停止します。
+
+```sh
+docker stop loadgen
+```
+
+2. Artifact Registry への push
+
+```sh
+repo="asia-northeast1-docker.pkg.dev/$( gcloud config get-value project )/demo"
+docker tag loadgen "${repo}/loadgen:v0.5"
+docker push "${repo}/loadgen:v0.5"
+```
+
+3. Load generator サービスのデプロイ
+
+Cloud Run への負荷かけサービスをデプロイします。
+
+```sh
+gcloud run deploy demo-loadgen-cr --platform "managed" --region "asia-northeast1" \
+    --image "${repo}/loadgen:v0.5" --cpu 4.0 --memory 1Gi \
+    --concurrency 1 --min-instances 0  --max-instances 10 \
+    --set-env-vars "PROJECT_ID=${project_id},ENVIRONMENT='Cloud Run',URL=http://$( gcloud compute \
+        addresses describe demo-instance-cr --region 'asia-northeast1' --format 'json' \
+        | jq -r '.address' )/wait?s=3,REQUEST=1000,CONCURRENCY=100,DURATION=30,TIMEOUT=10" \
+    --allow-unauthenticated
+```
+
+GKE への負荷かけサービスもデプロイします。
+
+```sh
+gcloud run deploy demo-loadgen-gke --platform "managed" --region "asia-northeast1" \
+    --image "${repo}/loadgen:v0.5" --cpu 4.0 --memory 1Gi \
+    --concurrency 1 --min-instances 0  --max-instances 10 \
+    --set-env-vars "PROJECT_ID=${project_id},ENVIRONMENT=GKE,URL=http://$( kubectl get \
+        gateways.gateway.networking.k8s.io instance -o json \
+        | jq -r ".status.addresses[0].value" )/wait?s=3,REQUEST=1000,CONCURRENCY=100,DURATION=30,TIMEOUT=10" \
+    --allow-unauthenticated
 ```
