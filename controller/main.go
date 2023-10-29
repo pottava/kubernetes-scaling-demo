@@ -43,13 +43,14 @@ func mustGetEnv(key string, defaultValue string) string {
 
 func main() {
 	projectId := mustGetEnv("PROJECT_ID", "")
-	ledCollection := mustGetEnv("FIRESTORE_COLLECTION", "led")
+	database := mustGetEnv("FIRESTORE_DATABASE", "(default)")
 	instanceCollection := mustGetEnv("INSTANCE_COLLECTION", "instances")
+	ledCollection := mustGetEnv("LED_COLLECTION", "leds")
 	done := make(chan bool)
 
 	ctx := context.Background()
 
-	client, err := firestore.NewClient(ctx, projectId)
+	client, err := firestore.NewClientWithDatabase(ctx, projectId, database)
 	if err != nil {
 		log.Fatal(err)
 	}

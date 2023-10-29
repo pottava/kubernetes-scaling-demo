@@ -3,7 +3,7 @@ kind: Service
 metadata:
   name: instance
   annotations:
-    networking.gke.io/max-rate-per-endpoint: "10"
+    networking.gke.io/max-rate-per-endpoint: "5"
 spec:
   type: ClusterIP
   selector:

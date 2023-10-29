@@ -35,12 +35,13 @@ func mustGetEnv(key string, defaultValue string) string {
 
 func main() {
 	projectId := mustGetEnv("PROJECT_ID", "")
+	database := mustGetEnv("FIRESTORE_DATABASE", "(default)")
 	instanceCollection := mustGetEnv("INSTANCE_COLLECTION", "instances")
 
 	randomHostId := uuid.New().String()
 	hostName := mustGetEnv("HOSTNAME", randomHostId)
 	ctx := context.Background()
-	client, err := firestore.NewClient(ctx, projectId)
+	client, err := firestore.NewClientWithDatabase(ctx, projectId, database)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -96,6 +97,7 @@ func main() {
 	http.HandleFunc("/pi", requestCounterMiddleware(rc, pi))
 	http.HandleFunc("/prime", requestCounterMiddleware(rc, prime))
 	http.HandleFunc("/fib", requestCounterMiddleware(rc, fib))
+	http.HandleFunc("/wait", requestCounterMiddleware(rc, wait))
 
 	http.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Active requests: %d", rc.GetActiveRequests())

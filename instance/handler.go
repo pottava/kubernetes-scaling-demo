@@ -67,3 +67,12 @@ func fib(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Fprintf(w, "Fibonacci(%d) = %d", n, res)
 }
+
+func wait(w http.ResponseWriter, r *http.Request) {
+	duration := 3
+	if candidate, err := strconv.Atoi(r.URL.Query().Get("s")); err == nil {
+		duration = candidate
+	}
+	time.Sleep(time.Duration(duration) * time.Second)
+	fmt.Fprintf(w, "Waited for %d seconds", duration)
+}

@@ -37,9 +37,9 @@ spec:
         env:
           - name: PROJECT_ID
             value: mofilabs-next-demo-02
-          - name: FIRESTORE_COLLECTION
-            value: cloudrun
           - name: INSTANCE_COLLECTION
-            value: cloudrun-instances
+            value: cr-instances
+          - name: LED_COLLECTION
+            value: cr
           - name: GAMMA
             value: "20.0"

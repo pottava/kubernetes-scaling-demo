@@ -9,4 +9,6 @@ lerna-debug.log*
 
 dist/
 
+k8s/**/setters.yaml
+
 **/.parcel-cache/
