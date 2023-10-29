@@ -309,7 +309,7 @@ echo "http://$( kubectl get services controller-gke \
    -o jsonpath='{.status.loadBalancer.ingress[0].ip}' )/"
 ```
 
-### Load generator on Cloud Run
+### Load generators on Cloud Run
 
 1. アプリケーションの確認
 
@@ -347,7 +347,7 @@ Cloud Run への負荷かけサービスをデプロイします。
 
 ```sh
 gcloud run deploy demo-loadgen-cr --platform "managed" --region "asia-northeast1" \
-    --image "${repo}/loadgen:v0.5" --cpu 4.0 --memory 1Gi \
+    --image "${repo}/loadgen:v0.5" --cpu 4.0 --memory 2Gi \
     --concurrency 1 --min-instances 0  --max-instances 10 \
     --set-env-vars "PROJECT_ID=${project_id},ENVIRONMENT='Cloud Run',URL=http://$( gcloud compute \
         addresses describe demo-instance-cr --region 'asia-northeast1' --format 'json' \
@@ -359,10 +359,69 @@ GKE への負荷かけサービスもデプロイします。
 
 ```sh
 gcloud run deploy demo-loadgen-gke --platform "managed" --region "asia-northeast1" \
-    --image "${repo}/loadgen:v0.5" --cpu 4.0 --memory 1Gi \
+    --image "${repo}/loadgen:v0.5" --cpu 4.0 --memory 2Gi \
     --concurrency 1 --min-instances 0  --max-instances 10 \
     --set-env-vars "PROJECT_ID=${project_id},ENVIRONMENT=GKE,URL=http://$( kubectl get \
         gateways.gateway.networking.k8s.io instance -o json \
         | jq -r ".status.addresses[0].value" )/wait?s=3,REQUEST=1000,CONCURRENCY=100,DURATION=30,TIMEOUT=10" \
     --allow-unauthenticated
+```
+
+### Web UI（LED シミュレーション）on Firebase
+
+https://console.firebase.google.com/ にアクセスし、Firebase プロジェクトを作成します。 
+
+1. CLI のインストール・認証
+
+```sh
+npm install -g firebase-tools
+firebase login --no-localhost
+```
+
+2. プロジェクト ID を設定ファイルに保存
+
+```txt
+export project_id=$( gcloud config get-value project )
+sed "s/project-id/${project_id}/" ui/.firebaserc.template > ui/.firebaserc
+sed "s/project-id/${project_id}/" ui/firebase.json.template > ui/firebase.json
+sed "s/project-id/${project_id}/" ui-cr/.firebaserc.template > ui-cr/.firebaserc
+sed "s/project-id/${project_id}/" ui-cr/firebase.json.template > ui-cr/firebase.json
+```
+
+3. UI for Cloud Run のビルドとデプロイ
+
+Firebase Hosting に新規サイトを追加します。
+
+```sh
+firebase hosting:sites:create "${project_id}-led-cloudrun" --project "${project_id}"
+```
+
+Firebase コンソール `プロジェクトの設定` から Web アプリ `ui-cr` を追加し、  
+`ui/src/app.js` の設定値を書き換え、ビルドします。
+
+```sh
+cd ui-cr
+npm install
+npm run build
+firebase deploy
+cd ..
+```
+
+4. UI for GKE のビルドとデプロイ
+
+Firebase Hosting に新規サイトを追加します。
+
+```sh
+firebase hosting:sites:create "${project_id}-led-gke" --project "${project_id}"
+```
+
+Firebase コンソール `プロジェクトの設定` から Web アプリ `ui` を追加し、  
+`ui/src/app.js` の設定値を書き換え、ビルドします。
+
+```sh
+cd ui
+npm install
+npm run build
+firebase deploy
+cd ..
 ```
