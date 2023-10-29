@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Next '23 Demo</title>
+    <title>Next Tokyo '23 Demo</title>
     <link rel="stylesheet" href="css/styles.css">
     <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png">
     <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
@@ -26,9 +26,9 @@
 
     <div class="container">
         <div class="title">
-            <p>Generate Load for <span id="environment"></span></p>
+            <p><span id="environment"></span> に負荷をかけます</p>
         </div>
-        <button id="load" onclick="generateLoad()">Generate Load</button>
+        <button id="load" onclick="generateLoad()">負荷を生成</button>
         <div id="loader" class="invisible">
             <div class="splash-screen-container"><svg class="logo" xmlns="http://www.w3.org/2000/svg"
                     xmlns:xlink="http://www.w3.org/1999/xlink" width="320" height="300" viewBox="0 0 320 300">
@@ -72,9 +72,9 @@
         </div>
         <div id="result" class="invisible">
             <div class="result-numbers">
-                <div class="right-align">Requests:</div>
+                <div class="right-align">リクエスト総数:</div>
                 <div id="requests"></div>
-                <div class="right-align">Avg Duration:</div>
+                <div class="right-align">応答時間平均:</div>
                 <div id="average"></div>
             </div>
             <div class="chart">

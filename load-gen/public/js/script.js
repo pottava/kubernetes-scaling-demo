@@ -64,7 +64,7 @@ async function generateLoad() {
         metadataContainer.innerHTML = '';
 
         let p = document.createElement('p');
-        p.innerText = 'Learn More: ';
+        p.innerText = '参考: ';
         metadataContainer.appendChild(p);
         metadata.forEach((item) => {
             if (item.type === 'youtube') {
