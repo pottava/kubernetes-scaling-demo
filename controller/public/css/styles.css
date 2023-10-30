@@ -6,11 +6,17 @@
 
 body {
     font-family: 'Roboto', sans-serif;
+    padding: 20px;
+}
+
+#title {
+    margin: 0 0 13px 0;
 }
 
 #pixels {
     display: flex;
     flex-direction: column;
+    margin: 10px 0;
 }
 
 .row {

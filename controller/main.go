@@ -104,6 +104,7 @@ func main() {
 		return c.String(http.StatusOK, "OK")
 	})
 
+	e.GET("/title", getTitle)
 	e.GET("/instances", getInstances)
 	e.POST("/skip", skipRender)
 	e.POST("/unskip", unskipRender)

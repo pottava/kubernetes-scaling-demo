@@ -19,6 +19,14 @@ import (
 	_ "image/png"
 )
 
+func getTitle(c echo.Context) error {
+	title := "LED controller"
+	if candidate, found := os.LookupEnv("CONTROLLER_FOR"); found {
+		title = candidate + " - LED controller"
+	}
+	return c.String(http.StatusOK, title)
+}
+
 func getInstances(c echo.Context) error {
 	return c.JSON(http.StatusOK, instances)
 }

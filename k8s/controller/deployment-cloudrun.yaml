@@ -34,6 +34,8 @@ spec:
         env:
         - name: PROJECT_ID
           value: project # kpt-set: ${project-id}
+        - name: CONTROLLER_FOR
+          value: "Cloud Run"
         - name: FIRESTORE_DATABASE
           value: "demo"
         - name: INSTANCE_COLLECTION
@@ -41,5 +43,5 @@ spec:
         - name: LED_COLLECTION
           value: "cr"
         - name: GAMMA
-          value: "20.0"
+          value: "10.0"
       serviceAccountName: sa # kpt-set: ${k-service-account}

@@ -32,6 +32,18 @@ function setupBoard() {
     }
 }
 
+async function setTitle() {
+    const response = await fetch("/title", {
+        method: "GET", Headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+        }
+    })
+    const text = await response.text();
+    document.title = text;
+    document.getElementById('title').innerHTML = text;
+}
+
 async function handleSubmit(event) {
     event.preventDefault();
     const form = event.currentTarget;
@@ -163,5 +175,6 @@ function clearPixels() {
 }
 
 window.onload = function () {
+    setTitle();
     setupBoard();
 }
