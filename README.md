@@ -117,7 +117,7 @@ docker run --name controller -d --rm -u $(id -u):$(id -g) -p 8000:8000 \
     -v "${HOME}/.config/gcloud:/gcp/config:ro" -e CLOUDSDK_CONFIG=/gcp/config \
     -e GOOGLE_APPLICATION_CREDENTIALS=/gcp/config/application_default_credentials.json \
     -e PROJECT_ID=$( gcloud config get-value project ) -e FIRESTORE_DATABASE=demo \
-    -e INSTANCE_COLLECTION=cr-instances -e LED_COLLECTION=cr \
+    -e INSTANCE_COLLECTION=cr-instances -e LED_COLLECTION=cr -e CONTROLLER_FOR=Test \
     -e GAMMA="1.0" controller
 ```
 
@@ -141,8 +141,8 @@ docker stop controller
 問題がなさそうであれば Artifact Registry へ docker push します。
 
 ```sh
-docker tag controller "${repo}/controller:v0.5"
-docker push "${repo}/controller:v0.5"
+docker tag controller "${repo}/controller:v0.6"
+docker push "${repo}/controller:v0.6"
 ```
 
 ### Instance on Cloud Run
@@ -221,6 +221,7 @@ echo "http://$( gcloud compute addresses describe demo-instance-cr \
 1. GKE Standard クラスタの作成
 
 ```sh
+export project_id=$( gcloud config get-value project )
 gcloud container clusters create demo --release-channel "stable" \
     --machine-type "e2-standard-4" --num-nodes 1 --min-nodes 1 --max-nodes 100 \
     --enable-autoscaling --workload-pool="${project_id}.svc.id.goog" \
@@ -272,7 +273,7 @@ kubectl apply -f k8s/instance-lb
 
 ```sh
 echo "http://$( kubectl get gateways.gateway.networking.k8s.io instance -o json \
-    | jq -r ".status.addresses[0].value" )/status"
+    | jq -r ".status.addresses[0].value" )/"
 ```
 
 ### Controllers on GKE
@@ -281,6 +282,7 @@ GKE と Cloud Run、それぞれの Controller を GKE 上にデプロイしま�
 環境依存の設定値をファイルに書き出し、
 
 ```txt
+export project_id=$( gcloud config get-value project )
 cat << EOF >k8s/controller/setters.yaml
 apiVersion: v1
 kind: ConfigMap
@@ -288,7 +290,7 @@ metadata:
   name: setters
 data:
   project-id: "${project_id}"
-  image-id: "asia-northeast1-docker.pkg.dev/${project_id}/demo/controller:v0.5"
+  image-id: "asia-northeast1-docker.pkg.dev/${project_id}/demo/controller:v0.6"
   k-service-account: "demo-apis"
 EOF
 ```
@@ -319,7 +321,7 @@ docker run --name loadgen -d --rm -p 9000:9000 \
     -e PROJECT_ID=$( gcloud config get-value project ) -e PORT=9000 \
     -e URL="http://$( gcloud compute addresses describe demo-instance-cr \
         --region 'asia-northeast1' --format 'json' | jq -r '.address' )/wait?s=3" \
-    -e REQUEST=1000 -e CONCURRENCY=100 -e DURATION=30 -e TIMEOUT=10 \
+    -e REQUEST=2000 -e CONCURRENCY=100 -e DURATION=60 -e TIMEOUT=10 \
     -e ENVIRONMENT='Cloud Run' loadgen
 ```
 
@@ -346,6 +348,7 @@ docker push "${repo}/loadgen:v0.5"
 Cloud Run への負荷かけサービスをデプロイします。
 
 ```sh
+export project_id=$( gcloud config get-value project )
 gcloud run deploy demo-loadgen-cr --platform "managed" --region "asia-northeast1" \
     --image "${repo}/loadgen:v0.5" --cpu 4.0 --memory 2Gi \
     --concurrency 1 --min-instances 0  --max-instances 10 \
@@ -424,4 +427,94 @@ npm install
 npm run build
 firebase deploy
 cd ..
+```
+
+### Raspberry Pi
+
+1. Application Default Credentials (ADC) の再作成
+
+```sh
+gcloud auth application-default login
+```
+
+2. Raspberry Pi への SSH・フォルダ作成
+
+```sh
+pi_user=google-cloud-japan
+pi_host=192.168.1.1
+ssh ${pi_user}@${pi_host} mkdir -p ~/app ~/.config/pip ~/.config/gcloud
+```
+
+2. ファイル転送
+
+```sh
+scp raspberry-pi/main.py ${pi_user}@${pi_host}:/home/${pi_user}/app/main.py
+scp raspberry-pi/requirements.txt ${pi_user}@${pi_host}:/home/${pi_user}/app/requirements.txt
+scp "${HOME}/.config/gcloud/application_default_credentials.json" \
+    ${pi_user}@${pi_host}:/home/${pi_user}/.config/gcloud/creds.json
+```
+
+3. プログラム実行（Cloud Run）
+
+SSH で端末に入り
+
+```sh
+ssh ${pi_user}@${pi_host}
+```
+
+依存関係を解決し、プログラムを実行します。
+
+```sh
+cat << EOF >~/.config/pip/pip.conf
+[global]
+break-system-packages = true
+EOF
+cd app/
+pip install -r requirements.txt
+GOOGLE_APPLICATION_CREDENTIALS=$HOME/.config/gcloud/creds.json PROJECT_ID=xxxxx \
+    FIRESTORE_DB=demo LED_COLLECTION=cr python main.py &
+jobs -l
+```
+
+4. プログラム実行（GKE）
+
+GKE 用 Raspberry Pi にも同様にファイルを転送、依存解決し、プログラムを実行します。
+
+```sh
+GOOGLE_APPLICATION_CREDENTIALS=$HOME/.config/gcloud/creds.json PROJECT_ID=xxxxx \
+    FIRESTORE_DB=demo LED_COLLECTION=gke python main.py &
+```
+
+### Teensy
+
+Arduino IDE を使い、Teensy 2 つにプログラム `next-demo-basic.ino` を転送します。  
+Teensy は受け取ったデータを表示するだけなので、同じプログラムで問題ありません。
+
+
+## 接続先一覧
+
+```sh
+export project_id=$( gcloud config get-value project )
+cat << EOF
+
+Instance on Cloud Run > http://$( gcloud compute addresses describe demo-instance-cr \
+    --region "asia-northeast1" --format json | jq -r .address )/
+Instance on GKE > http://$( kubectl get gateways.gateway.networking.k8s.io instance \
+    -o json | jq -r ".status.addresses[0].value" )/
+
+Controllers on Cloud Run > http://$( kubectl get services controller-cloudrun \
+    -o jsonpath='{.status.loadBalancer.ingress[0].ip}' )/
+Controllers on GKE > http://$( kubectl get services controller-gke \
+    -o jsonpath='{.status.loadBalancer.ingress[0].ip}' )/
+    Unskip: $ curl -iXPOST http://ip/unskip
+
+Load-Gen for Cloud Run > $( gcloud run services describe demo-loadgen-cr \
+    --region "asia-northeast1" --format 'value(status.url)' )
+Load-Gen for GKE > $( gcloud run services describe demo-loadgen-gke \
+    --region "asia-northeast1" --format 'value(status.url)' )
+
+UI for Cloud Run > https://${project_id}-led-cloudrun.web.app
+UI for GKE > https://${project_id}-led-gke.web.app
+
+EOF
 ```
