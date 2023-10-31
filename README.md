@@ -442,7 +442,8 @@ gcloud auth application-default login
 ```sh
 pi_user=google-cloud-japan
 pi_host=192.168.1.1
-ssh ${pi_user}@${pi_host} mkdir -p ~/app ~/.config/pip ~/.config/gcloud
+ssh ${pi_user}@${pi_host} mkdir -p /home/${pi_user}/app \
+    /home/${pi_user}/.config/pip /home/${pi_user}/.config/gcloud
 ```
 
 2. ファイル転送
@@ -472,7 +473,7 @@ EOF
 cd app/
 pip install -r requirements.txt
 GOOGLE_APPLICATION_CREDENTIALS=$HOME/.config/gcloud/creds.json PROJECT_ID=xxxxx \
-    FIRESTORE_DB=demo LED_COLLECTION=cr python main.py &
+    FIRESTORE_DB=demo LED_COLLECTION=cr python app/main.py &
 jobs -l
 ```
 
@@ -482,7 +483,7 @@ GKE 用 Raspberry Pi にも同様にファイルを転送、依存解決し、�
 
 ```sh
 GOOGLE_APPLICATION_CREDENTIALS=$HOME/.config/gcloud/creds.json PROJECT_ID=xxxxx \
-    FIRESTORE_DB=demo LED_COLLECTION=gke python main.py &
+    FIRESTORE_DB=demo LED_COLLECTION=gke python app/main.py &
 ```
 
 ### Teensy
