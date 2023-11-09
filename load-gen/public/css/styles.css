@@ -84,6 +84,7 @@ button[disabled]{
     justify-content: center;
     align-items: center;
     margin: 16px;
+    font-size: 1.1rem;
 }
 
 /* .youtube-container {

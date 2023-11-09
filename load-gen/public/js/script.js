@@ -6,9 +6,41 @@ window.onload = async function () {
     const response = await fetch('/metadata');
     metadata = await response.json();
     const resp = await fetch('/environment');
-    env = await resp.json();
-    console.log(env);
-    document.getElementById('environment').innerHTML = env.env;
+    const envs = await resp.json();
+
+    document.getElementById('environment').innerHTML = envs.env;
+    document.getElementById('revision').innerHTML = 'App Revision: '+envs.rev;
+
+    if (! metadata) return;
+    let metadataContainer = document.getElementById('links');
+    metadataContainer.innerHTML = '';
+
+    let p = document.createElement('p');
+    p.innerText = '参考: ';
+    metadataContainer.appendChild(p);
+    metadata.forEach((item) => {
+        if (item.type === 'youtube') {
+            console.log(item);
+            // let div = document.createElement('div');
+            // div.classList.add('youtube-container');
+            let frame = document.createElement('iframe');
+            frame.title = item.title;
+            frame.src = item.href;
+            frame.classList.add('youtube');
+
+            // div.appendChild(frame);
+            metadataContainer.appendChild(frame);
+        } else {
+            let div = document.createElement('div');
+            div.classList.add('link');
+            let link = document.createElement('a');
+            link.href = item.href;
+            link.target = '_blank';
+            link.innerText = item.title;
+            div.appendChild(link);
+            metadataContainer.appendChild(div);
+        }
+    });
 }
 
 async function generateLoad() {
@@ -55,41 +87,6 @@ async function generateLoad() {
                 }
             }
         });
-
     }
     document.getElementById('load').disabled = false;
-
-    if(metadata) {
-        let metadataContainer = document.getElementById('links');
-        metadataContainer.innerHTML = '';
-
-        let p = document.createElement('p');
-        p.innerText = '参考: ';
-        metadataContainer.appendChild(p);
-        metadata.forEach((item) => {
-            if (item.type === 'youtube') {
-                console.log(item);
-                // let div = document.createElement('div');
-                // div.classList.add('youtube-container');
-                let frame = document.createElement('iframe');
-                frame.title = item.title;
-                frame.src = item.href;
-                frame.classList.add('youtube');
-
-                // div.appendChild(frame);
-                metadataContainer.appendChild(frame);
-            } else {
-                let div = document.createElement('div');
-                div.classList.add('link');
-                let link = document.createElement('a');
-                link.href = item.href;
-                link.target = '_blank';
-                link.innerText = item.title;
-                div.appendChild(link);
-                metadataContainer.appendChild(div);
-            }
-
-
-        })
-    }
 }

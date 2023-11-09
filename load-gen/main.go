@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/csv"
+	"fmt"
 	"net/http"
 	"net/url"
 	"os"
@@ -62,6 +63,8 @@ func getEnvOrDefaultInt(key string, def int) int {
 
 func generate(cfg HeyConfig) func(echo.Context) error {
 	return func(c echo.Context) error {
+		s := time.Now()
+
 		u, _ := url.Parse(cfg.URL)
 		w := &requester.Work{
 			Request: &http.Request{
@@ -91,6 +94,9 @@ func generate(cfg HeyConfig) func(echo.Context) error {
 
 		w.Run()
 
+		fmt.Fprintf(backupStdOut, "Hey: %s\n", time.Since(s).Truncate(time.Second).String())
+		s = time.Now()
+
 		writer.Close()
 		os.Stdout = backupStdOut
 		csvReader := csv.NewReader(reader)
@@ -102,6 +108,7 @@ func generate(cfg HeyConfig) func(echo.Context) error {
 			panic(err)
 		}
 		res := csvReport(data)
+		fmt.Fprintf(backupStdOut, "Report: %s\n", time.Since(s).Truncate(time.Second).String())
 		return c.JSON(http.StatusOK, res)
 	}
 }
@@ -198,10 +205,11 @@ func processLinks(links string) []*Link {
 	return res
 }
 
-func environment(env string) func(c echo.Context) error {
+func environment(env, revision string) func(c echo.Context) error {
 	return func(c echo.Context) error {
 		return c.JSON(http.StatusOK, map[string]string{
 			"env": env,
+			"rev": revision,
 		})
 	}
 }
@@ -214,6 +222,7 @@ func main() {
 	timeout := getEnvOrDefaultInt("TIMEOUT", 10)
 
 	env := getEnvOrDefault("ENVIRONMENT", "Cloud Run")
+	revision := getEnvOrDefault("K_REVISION", "local")
 	linksEnv := getEnvOrDefault("LINKS", "クラスタの自動スケーリング|https://cloud.google.com/kubernetes-engine/docs/concepts/cluster-autoscaler?hl=ja,コード|https://github.com/pottava/kubernetes-scaling-demo/")
 	links := processLinks(linksEnv)
 
@@ -237,7 +246,7 @@ func main() {
 	)
 	e.POST("/generate", generate(cfg))
 	e.GET("/metadata", metadata(links))
-	e.GET("/environment", environment(env))
+	e.GET("/environment", environment(env, revision))
 
 	port := os.Getenv("PORT")
 	if port == "" {
