@@ -102,9 +102,9 @@ docker stop instance
 
 ```sh
 repo="asia-northeast1-docker.pkg.dev/$( gcloud config get-value project )/demo"
-docker tag instance "${repo}/instance:v0.5"
+docker tag instance "${repo}/instance:v0.7"
 gcloud auth configure-docker asia-northeast1-docker.pkg.dev
-docker push "${repo}/instance:v0.5"
+docker push "${repo}/instance:v0.7"
 ```
 
 ### Controller コンテナ
@@ -118,7 +118,7 @@ docker run --name controller -d --rm -u $(id -u):$(id -g) -p 8000:8000 \
     -e GOOGLE_APPLICATION_CREDENTIALS=/gcp/config/application_default_credentials.json \
     -e PROJECT_ID=$( gcloud config get-value project ) -e FIRESTORE_DATABASE=demo \
     -e INSTANCE_COLLECTION=cr-instances -e LED_COLLECTION=cr -e CONTROLLER_FOR=Test \
-    -e GAMMA="1.0" controller
+    -e GAMMA="20.0" controller
 ```
 
 2. Web にアクセス、挙動を確認
@@ -141,8 +141,8 @@ docker stop controller
 問題がなさそうであれば Artifact Registry へ docker push します。
 
 ```sh
-docker tag controller "${repo}/controller:v0.6"
-docker push "${repo}/controller:v0.6"
+docker tag controller "${repo}/controller:v0.7"
+docker push "${repo}/controller:v0.7"
 ```
 
 ### Instance on Cloud Run
@@ -161,10 +161,12 @@ gcloud projects add-iam-policy-binding "${project_id}" \
 
 2. Instance サービスのデプロイ
 
+[割り当て](https://console.cloud.google.com/iam-admin/quotas?service=run.googleapis.com)を確認し、必要なら増やします。
+
 ```sh
 gcloud run deploy demo-instance --platform "managed" --region "asia-northeast1" \
-    --image "${repo}/instance:v0.5" --cpu 1.0 --memory 512Mi --no-cpu-throttling \
-    --concurrency 3 --min-instances 0  --max-instances 1000 \
+    --image "${repo}/instance:v0.7" --cpu 1.0 --memory 512Mi --no-cpu-throttling \
+    --concurrency 1 --min-instances 0  --max-instances 4096 \
     --ingress "internal-and-cloud-load-balancing" --allow-unauthenticated \
     --set-env-vars "PROJECT_ID=${project_id},FIRESTORE_DATABASE=demo,INSTANCE_COLLECTION=cr-instances,LED_COLLECTION=cr" \
     --service-account "demo-apis@${project_id}.iam.gserviceaccount.com"
@@ -218,7 +220,17 @@ echo "http://$( gcloud compute addresses describe demo-instance-cr \
 
 ### Instance on GKE
 
-1. GKE Standard クラスタの作成
+1. GKE クラスタの作成
+
+GKE Autopilot の場合
+
+```sh
+export project_id=$( gcloud config get-value project )
+gcloud container clusters create-auto demo-led --release-channel "stable" \
+    --network "demo-network" --subnetwork "demo-tokyo" --region "asia-northeast1"
+```
+
+GKE Standard の場合
 
 ```sh
 export project_id=$( gcloud config get-value project )
@@ -250,7 +262,7 @@ metadata:
   name: setters
 data:
   project-id: "${project_id}"
-  image-id: "asia-northeast1-docker.pkg.dev/${project_id}/demo/instance:v0.5"
+  image-id: "asia-northeast1-docker.pkg.dev/${project_id}/demo/instance:v0.7"
   k-service-account: "demo-apis"
   g-service-account: "demo-apis@${project_id}.iam.gserviceaccount.com"
 EOF
@@ -290,7 +302,7 @@ metadata:
   name: setters
 data:
   project-id: "${project_id}"
-  image-id: "asia-northeast1-docker.pkg.dev/${project_id}/demo/controller:v0.6"
+  image-id: "asia-northeast1-docker.pkg.dev/${project_id}/demo/controller:v0.7"
   k-service-account: "demo-apis"
 EOF
 ```
@@ -320,9 +332,9 @@ docker build -t loadgen load-gen/
 docker run --name loadgen -d --rm -p 9000:9000 \
     -e PROJECT_ID=$( gcloud config get-value project ) -e PORT=9000 \
     -e URL="http://$( gcloud compute addresses describe demo-instance-cr \
-        --region 'asia-northeast1' --format 'json' | jq -r '.address' )/wait?s=3" \
-    -e REQUEST=2000 -e CONCURRENCY=100 -e DURATION=60 -e TIMEOUT=10 \
-    -e ENVIRONMENT='Cloud Run' loadgen
+        --region 'asia-northeast1' --format 'json' | jq -r '.address' )/" \
+    -e REQUEST=100 -e CONCURRENCY=50 -e DURATION=20 -e TIMEOUT=5 \
+    -e ENVIRONMENT='Cloud Run' -e K_REVISION=dev loadgen
 ```
 
 Web にアクセスし、負荷をかけてみます。
@@ -339,8 +351,8 @@ docker stop loadgen
 
 ```sh
 repo="asia-northeast1-docker.pkg.dev/$( gcloud config get-value project )/demo"
-docker tag loadgen "${repo}/loadgen:v0.5"
-docker push "${repo}/loadgen:v0.5"
+docker tag loadgen "${repo}/loadgen:v0.7"
+docker push "${repo}/loadgen:v0.7"
 ```
 
 3. Load generator サービスのデプロイ
@@ -350,24 +362,24 @@ Cloud Run への負荷かけサービスをデプロイします。
 ```sh
 export project_id=$( gcloud config get-value project )
 gcloud run deploy demo-loadgen-cr --platform "managed" --region "asia-northeast1" \
-    --image "${repo}/loadgen:v0.5" --cpu 4.0 --memory 2Gi \
-    --concurrency 1 --min-instances 0  --max-instances 10 \
-    --set-env-vars "PROJECT_ID=${project_id},ENVIRONMENT='Cloud Run',URL=http://$( gcloud compute \
+    --image "${repo}/loadgen:v0.7" --cpu 4.0 --memory 2Gi \
+    --concurrency 1 --min-instances 0  --max-instances 100 \
+    --set-env-vars "PROJECT_ID=${project_id},ENVIRONMENT=Cloud Run,URL=http://$( gcloud compute \
         addresses describe demo-instance-cr --region 'asia-northeast1' --format 'json' \
-        | jq -r '.address' )/wait?s=3,REQUEST=1000,CONCURRENCY=100,DURATION=30,TIMEOUT=10" \
-    --allow-unauthenticated
+        | jq -r '.address' )/wait?s=5,REQUEST=1000,CONCURRENCY=700,DURATION=30,TIMEOUT=7" \
+    --allow-unauthenticated --timeout '10m'
 ```
 
 GKE への負荷かけサービスもデプロイします。
 
 ```sh
 gcloud run deploy demo-loadgen-gke --platform "managed" --region "asia-northeast1" \
-    --image "${repo}/loadgen:v0.5" --cpu 4.0 --memory 2Gi \
-    --concurrency 1 --min-instances 0  --max-instances 10 \
+    --image "${repo}/loadgen:v0.7" --cpu 4.0 --memory 2Gi \
+    --concurrency 1 --min-instances 0  --max-instances 100 \
     --set-env-vars "PROJECT_ID=${project_id},ENVIRONMENT=GKE,URL=http://$( kubectl get \
         gateways.gateway.networking.k8s.io instance -o json \
-        | jq -r ".status.addresses[0].value" )/wait?s=3,REQUEST=1000,CONCURRENCY=100,DURATION=30,TIMEOUT=10" \
-    --allow-unauthenticated
+        | jq -r ".status.addresses[0].value" )/wait?s=5,REQUEST=1000,CONCURRENCY=700,DURATION=30,TIMEOUT=7" \
+    --allow-unauthenticated --timeout '10m'
 ```
 
 ### Web UI（LED シミュレーション）on Firebase
