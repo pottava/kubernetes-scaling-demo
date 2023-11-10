@@ -117,7 +117,7 @@ docker run --name controller -d --rm -u $(id -u):$(id -g) -p 8000:8000 \
     -v "${HOME}/.config/gcloud:/gcp/config:ro" -e CLOUDSDK_CONFIG=/gcp/config \
     -e GOOGLE_APPLICATION_CREDENTIALS=/gcp/config/application_default_credentials.json \
     -e PROJECT_ID=$( gcloud config get-value project ) -e FIRESTORE_DATABASE=demo \
-    -e INSTANCE_COLLECTION=cr-instances -e LED_COLLECTION=cr -e CONTROLLER_FOR=Test \
+    -e INSTANCE_COLLECTION=cr-instances -e LED_COLLECTION=cr -e CONTROLLER_FOR="Cloud Run" \
     -e GAMMA="20.0" controller
 ```
 
@@ -141,8 +141,8 @@ docker stop controller
 問題がなさそうであれば Artifact Registry へ docker push します。
 
 ```sh
-docker tag controller "${repo}/controller:v0.7"
-docker push "${repo}/controller:v0.7"
+docker tag controller "${repo}/controller:v0.8"
+docker push "${repo}/controller:v0.8"
 ```
 
 ### Instance on Cloud Run
@@ -287,7 +287,7 @@ kubectl apply -f k8s/instance-lb
 echo "http://$( kubectl get gateways.gateway.networking.k8s.io instance -o json \
     | jq -r ".status.addresses[0].value" )/"
 ```
-
+git 
 ### Controllers on GKE
 
 GKE と Cloud Run、それぞれの Controller を GKE 上にデプロイします。  
@@ -302,7 +302,7 @@ metadata:
   name: setters
 data:
   project-id: "${project_id}"
-  image-id: "asia-northeast1-docker.pkg.dev/${project_id}/demo/controller:v0.7"
+  image-id: "asia-northeast1-docker.pkg.dev/${project_id}/demo/controller:v0.8"
   k-service-account: "demo-apis"
 EOF
 ```

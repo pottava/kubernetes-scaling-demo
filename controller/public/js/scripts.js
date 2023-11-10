@@ -144,6 +144,18 @@ function stopGOL() {
     intervalID = null;
 }
 
+async function unskip() {
+    const response = await fetch("/unskip", {
+        method: "POST",
+        Headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+        }
+    })
+    const json = await response.json();
+    alert(json.status);
+}
+
 async function sendPixels() {
     const url = "/direct"
 
