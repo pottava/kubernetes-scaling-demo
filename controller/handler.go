@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"time"
 
 	"cloud.google.com/go/firestore"
 	"github.com/labstack/echo/v4"
@@ -37,6 +38,9 @@ func skipRender(c echo.Context) error {
 }
 
 func unskipRender(c echo.Context) error {
+	if duration, err := strconv.Atoi(c.Request().URL.Query().Get("wait")); err == nil {
+		time.Sleep(time.Duration(duration) * time.Second)
+	}
 	skip = false
 	return c.JSON(http.StatusOK, map[string]interface{}{"status": "ok", "skip": false})
 }

@@ -287,7 +287,7 @@ kubectl apply -f k8s/instance-lb
 echo "http://$( kubectl get gateways.gateway.networking.k8s.io instance -o json \
     | jq -r ".status.addresses[0].value" )/"
 ```
-git 
+
 ### Controllers on GKE
 
 GKE と Cloud Run、それぞれの Controller を GKE 上にデプロイします。  
@@ -475,7 +475,7 @@ SSH で端末に入り
 ssh ${pi_user}@${pi_host}
 ```
 
-依存関係を解決し、プログラムを実行します。
+依存関係を解決し、プログラムを試験的に実行します。
 
 ```sh
 cat << EOF >~/.config/pip/pip.conf
@@ -483,19 +483,66 @@ cat << EOF >~/.config/pip/pip.conf
 break-system-packages = true
 EOF
 cd app/
+python3 -m venv .
+source ./bin/activate
 pip install -r requirements.txt
 GOOGLE_APPLICATION_CREDENTIALS=$HOME/.config/gcloud/creds.json PROJECT_ID=xxxxx \
-    FIRESTORE_DB=demo LED_COLLECTION=cr python app/main.py &
-jobs -l
+    FIRESTORE_DB=demo LED_COLLECTION=cr python main.py
+```
+
+問題なければスタートアップスクリプトとして登録します。環境変数を設定して、
+
+```sh
+cat << EOF >led-envs
+GOOGLE_APPLICATION_CREDENTIALS=$HOME/.config/gcloud/creds.json
+PROJECT_ID=xxxxx
+FIRESTORE_DB=demo
+LED_COLLECTION=cr 
+EOF
+sudo mkdir -p /etc/sysconfig
+sudo mv led-envs /etc/sysconfig/
+```
+
+Systemd のサービスとして登録して、再起動します。
+
+```sh
+cat << EOF >led.service
+[Unit]
+Description=LED Auto Scaling Containers
+
+[Service]
+EnvironmentFile=/etc/sysconfig/led-envs
+ExecStart=/home/google-cloud-japan/app/bin/python3 /home/google-cloud-japan/app/main.py
+
+[Install]
+WantedBy=multi-user.target
+EOF
+sudo mv led.service /etc/systemd/system/
+sudo systemctl enable led
+sudo reboot
+```
+
+再起動後、正常に動作しているかを確かめてみます。
+
+```sh
+sudo systemctl status led
+journalctl -xfeu led
 ```
 
 4. プログラム実行（GKE）
 
-GKE 用 Raspberry Pi にも同様にファイルを転送、依存解決し、プログラムを実行します。
+GKE 用 Raspberry Pi にも同様にファイルを転送、依存解決し、プログラムを試験的に実行、  
+問題なければスタートアップスクリプトとして登録します。
+
+環境変数の設定が Cloud Run と一部異なることに注意してください。
 
 ```sh
-GOOGLE_APPLICATION_CREDENTIALS=$HOME/.config/gcloud/creds.json PROJECT_ID=xxxxx \
-    FIRESTORE_DB=demo LED_COLLECTION=gke python app/main.py &
+cat << EOF >/etc/sysconfig/led
+GOOGLE_APPLICATION_CREDENTIALS=$HOME/.config/gcloud/creds.json
+PROJECT_ID=xxxxx
+FIRESTORE_DB=demo
+LED_COLLECTION=gke
+EOF
 ```
 
 ### Teensy
@@ -519,7 +566,6 @@ Controllers on Cloud Run > http://$( kubectl get services controller-cloudrun \
     -o jsonpath='{.status.loadBalancer.ingress[0].ip}' )/
 Controllers on GKE > http://$( kubectl get services controller-gke \
     -o jsonpath='{.status.loadBalancer.ingress[0].ip}' )/
-    Unskip: $ curl -iXPOST http://ip/unskip
 
 Load-Gen for Cloud Run > $( gcloud run services describe demo-loadgen-cr \
     --region "asia-northeast1" --format 'value(status.url)' )

@@ -45,12 +45,23 @@ def get_byte_data():
         return None
 
 def main():
+    ser_is_open = False
     try:
-        ser = serial.Serial(serial_port, 9600)
         doc_ref = db.collection(collection).document("data")
+        print("Start polling LED data from Firestore")
+
         while True:
             color = get_byte_data()
-            ser.write(color)
+
+            if not ser_is_open:
+                try:
+                    ser = serial.Serial(serial_port, 9600)
+                    ser_is_open = True
+                except serial.SerialException as e:
+                    print("Could not open serial port: {}".format(e))
+
+            if ser_is_open:
+                ser.write(color)
             time.sleep(1)
 
     except KeyboardInterrupt:
@@ -62,6 +73,7 @@ def main():
         time.sleep(1)
     except Exception:
         traceback.print_exc(file=sys.stdout)
+
     sys.exit(0)
 
 
